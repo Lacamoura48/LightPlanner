@@ -1,5 +1,11 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {StyleSheet, Text, TouchableHighlight, View} from 'react-native';
+import {
+  Dimensions,
+  StyleSheet,
+  Text,
+  TouchableHighlight,
+  View,
+} from 'react-native';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -7,9 +13,13 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import Svg from 'react-native-svg';
-import Rectangle from './Rectangle';
+import Rectangle from './objects/Rectangle';
+import Line from './objects/Line';
+import Asset from './objects/Asset';
+import ObjectActionsMenu from './menu/ObjectActionsMenu';
 
 const InfiniteCanvas = () => {
+  const {width, height} = Dimensions.get('window');
   const scale = useSharedValue(1);
   const scaleOffset = useSharedValue(0);
   const objectsDataToSubmit = useRef([{x: 10, y: 10, id: 1}]);
@@ -25,20 +35,50 @@ const InfiniteCanvas = () => {
       item => item.id === id,
     );
     if (objectToChange) {
-      objectToChange.x = coordinations.x;
-      objectToChange.y = coordinations.y;
+      const tempObject = {...objectToChange};
+      tempObject.x = coordinations.x;
+      tempObject.y = coordinations.y;
       objectsDataToSubmit.current.map(item =>
-        item.id === id ? objectToChange : item,
+        item.id === id ? tempObject : item,
       );
     }
   };
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  const updateRotation = id => {
+    const objectToChange = objectsData.find(item => item.id === id);
+    if (objectToChange?.type === 'line') {
+      const tempObject = {...objectToChange};
+      tempObject.rotation = tempObject.rotation ? false : true;
+      setObjectsData(p => p.map(item => (item.id === id ? tempObject : item)));
+    } else if (objectToChange?.type === 'asset') {
+      const tempObject = {...objectToChange};
+      tempObject.rotation = tempObject.rotation
+        ? tempObject.rotation === 3
+          ? 0
+          : tempObject.rotation + 1
+        : 1;
+      setObjectsData(p => p.map(item => (item.id === id ? tempObject : item)));
+    }
+  };
+  const deleteObject = () => {
+    setObjectsData((prevItems) => prevItems.filter(item => item.id !== pressedObject));
+  };
+  const translateX = useSharedValue(-600 + width / 2);
+  const translateY = useSharedValue(-600 + height / 2);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
-  const [objectsData, setObjectsData] = useState([{x: 10, y: 10, id: 1}]);
-  function addObject() {
-    setObjectsData(p => [...p, {x: 10, y: 10, id: p.length + 1}]);
+  const [objectsData, setObjectsData] = useState([
+    {x: 550, y: 550, id: 1, type: 'asset'},
+  ]);
+  function addObject(type) {
+    setObjectsData(p => [
+      ...p,
+      {
+        x: -translateX.value + width / 2 - 50,
+        y: -translateY.value + height / 2 - 50,
+        id: p.length + 1,
+        type: type,
+      },
+    ]);
   }
   const pinch = Gesture.Pinch()
     .onChange(e => {
@@ -79,27 +119,69 @@ const InfiniteCanvas = () => {
         <Animated.View style={[styles.flex, animatedStyles]}>
           {objectsData.length > 0 ? (
             <Svg height="100%" width="100%">
-              {objectsData.map((object, index) => (
-                <Rectangle
-                  selectHandler={() => objectPressHandler(object.id)}
-                  positionHandler={coordinations =>
-                    updateObjectPosition(coordinations, object.id)
-                  }
-                  selected={pressedObject === object.id}
-                  key={index}
-                  x={object.x}
-                  y={object.y}
-                />
-              ))}
+              {objectsData.map((object, index) =>
+                object.type === 'rect' ? (
+                  <Rectangle
+                    selectHandler={() => objectPressHandler(object.id)}
+                    positionHandler={coordinations =>
+                      updateObjectPosition(coordinations, object.id)
+                    }
+                    selected={pressedObject === object.id}
+                    key={index}
+                    x={object.x}
+                    y={object.y}
+                  />
+                ) : object.type === 'line' ? (
+                  <Line
+                    selectHandler={() => objectPressHandler(object.id)}
+                    positionHandler={coordinations =>
+                      updateObjectPosition(coordinations, object.id)
+                    }
+                    rotationHandler={() => updateRotation(object.id)}
+                    rotated={object.rotation}
+                    selected={pressedObject === object.id}
+                    key={index}
+                    x={object.x}
+                    y={object.y}
+                  />
+                ) : (
+                  <Asset
+                    selectHandler={() => objectPressHandler(object.id)}
+                    positionHandler={coordinations =>
+                      updateObjectPosition(coordinations, object.id)
+                    }
+                    selected={pressedObject === object.id}
+                    key={index}
+                    rotated={object.rotation}
+                    x={object.x}
+                    y={object.y}
+                  />
+                ),
+              )}
             </Svg>
           ) : (
             <View />
           )}
         </Animated.View>
       </GestureDetector>
-      <TouchableHighlight style={styles.addButton} onPress={addObject}>
-        <Text style={{color: 'white'}}>+ Rectangle</Text>
-      </TouchableHighlight>
+      <View style={styles.buttonsContainer}>
+        <TouchableHighlight
+          style={styles.addButton}
+          onPress={() => addObject('rect')}>
+          <Text style={{color: 'white'}}>+ Rectangle</Text>
+        </TouchableHighlight>
+        <TouchableHighlight
+          style={styles.addButton}
+          onPress={() => addObject('line')}>
+          <Text style={{color: 'white'}}>+ Ligne</Text>
+        </TouchableHighlight>
+        <TouchableHighlight
+          style={styles.addButton}
+          onPress={() => addObject('asset')}>
+          <Text style={{color: 'white'}}>+ asset</Text>
+        </TouchableHighlight>
+      </View>
+      {pressedObject && <ObjectActionsMenu updateRotation={() => updateRotation(pressedObject)} deleteObject={deleteObject} />}
     </View>
   );
 };
@@ -112,18 +194,19 @@ const styles = StyleSheet.create({
   flex: {
     width: 1200,
     height: 1200,
-    transform: [{scale: 2.5}],
     backgroundColor: 'white',
   },
   addButton: {
     paddingHorizontal: 28,
     paddingVertical: 14,
     alignSelf: 'center',
-    marginBottom: 16,
     backgroundColor: 'blue',
+  },
+  buttonsContainer: {
     position: 'absolute',
     bottom: 10,
-    left: 200,
+    left: 10,
+    flexDirection: 'row',
   },
 });
 

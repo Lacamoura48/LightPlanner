@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {Image, StyleSheet, View} from 'react-native';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -8,16 +8,16 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-const Rectangle = ({
+const Asset = ({
   x,
   y,
   selectHandler,
   selected,
   positionHandler,
   sizeHandler,
+  rotated,
 }) => {
   // const pressed = useSharedValue(selected);
-  const [coords, setCoords] = useState({x, y});
   const translateX = useSharedValue(x);
   const translateY = useSharedValue(y);
   const offsetX = useSharedValue(0);
@@ -79,21 +79,33 @@ const Rectangle = ({
   const animatedStyles = useAnimatedStyle(() => ({
     left: translateX.value + offsetX.value,
     top: translateY.value + offsetY.value,
-    backgroundColor: selected ? 'yellow' : 'beige',
-    borderWidth: 1,
+    borderWidth: selected ? 1 : 0,
     borderColor: 'orange',
     width: scaleX.value + scaleOffsetX.value,
     height: scaleY.value + scaleOffsetY.value,
     position: 'absolute',
   }));
-  const rectangleGesture = Gesture.Simultaneous(pan, tap);
+  function getRotation(num) {
+    'worklet';
+    const rotations = ['0deg', '90deg', '180deg', '270deg'];
+    return rotations[num || 0];
+  }
+  const imageStyles = useAnimatedStyle(() => ({
+    transform: [{rotate: getRotation(rotated)}],
+  }));
+  const assetGesture = Gesture.Simultaneous(pan, tap);
   useDerivedValue(
     () => runOnJS(positionHandler)({x: translateX.value, y: translateY.value}),
     [translateX.value, translateY.value],
   );
   return (
-    <GestureDetector gesture={rectangleGesture}>
+    <GestureDetector gesture={assetGesture}>
       <Animated.View style={[animatedStyles]}>
+        <Animated.Image
+          source={require('../../assets/bed.png')}
+          style={[styles.imageStyles, imageStyles]}
+          resizeMode="contain"
+        />
         {selected && (
           <GestureDetector gesture={scalePan}>
             <View style={styles.scaleHandle}></View>
@@ -104,7 +116,7 @@ const Rectangle = ({
   );
 };
 
-export default Rectangle;
+export default Asset;
 
 const styles = StyleSheet.create({
   scaleHandle: {
@@ -115,5 +127,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -15,
     bottom: -15,
+  },
+  imageStyles: {
+    width: '100%',
+    height: '100%',
   },
 });
